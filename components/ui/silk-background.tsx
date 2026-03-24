@@ -2,17 +2,6 @@
 
 import { useEffect, useRef } from "react";
 
-interface Thread {
-  fromLeft: boolean;
-  yBase: number;
-  amp: number;
-  freq: number;
-  phase: number;
-  speed: number;
-  lineWidth: number;
-  alpha: number;
-}
-
 export function SilkBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -36,65 +25,62 @@ export function SilkBackground() {
     resize();
     window.addEventListener("resize", resize);
 
-    // Fixed seed — no re-randomization on re-render
-    const N = 20;
-    const threads: Thread[] = Array.from({ length: N * 2 }, (_, i) => ({
-      fromLeft: i < N,
-      yBase: ((i % N) + 0.5) / N,
-      amp: 28 + (i % 7) * 14,
-      freq: 0.22 + (i % 5) * 0.07,
-      phase: (i * 1.9021) % (Math.PI * 2),
-      speed: 0.14 + (i % 6) * 0.035,
-      lineWidth: 0.5 + (i % 5) * 0.4,
-      alpha: 0.08 + (i % 6) * 0.05,
-    }));
+    // Two groups of diagonal lines at opposite angles — PS XMB style
+    // Left group sweeps right (+angle), right group sweeps left (−angle)
+    const ANGLE = 22; // degrees from horizontal
+    const RAD = (ANGLE * Math.PI) / 180;
+
+    const groups = [
+      { angle: RAD,  direction:  1, count: 7, speed: 22, alpha: 0.20, lw: 1.1 },
+      { angle: -RAD, direction: -1, count: 6, speed: 16, alpha: 0.16, lw: 0.85 },
+    ];
 
     const draw = () => {
       const W = canvas.clientWidth;
       const H = canvas.clientHeight;
       ctx.clearRect(0, 0, W, H);
 
-      for (const th of threads) {
-        const y = th.yBase * H;
-        const w1 = Math.sin(t * th.speed + th.phase) * th.amp;
-        const w2 = Math.sin(t * th.speed * 0.65 + th.phase + 1.8) * th.amp * 0.55;
+      const diag = Math.hypot(W, H);
 
-        // Left threads: from x=-5% to x=68%; right threads: from x=105% to x=32%
-        const x0 = th.fromLeft ? -W * 0.05 : W * 1.05;
-        const x3 = th.fromLeft ? W * 0.68  : W * 0.32;
-        const x1 = x0 + (x3 - x0) * 0.3;
-        const x2 = x0 + (x3 - x0) * 0.7;
+      for (const g of groups) {
+        ctx.save();
+        ctx.translate(W / 2, H / 2);
+        ctx.rotate(g.angle);
 
-        // Gradient fades to 0 at both ends — peaks in the middle of each thread
-        const grad = ctx.createLinearGradient(x0, 0, x3, 0);
-        if (th.fromLeft) {
+        const spacing = diag / g.count;
+        // Continuous scrolling offset — wraps seamlessly
+        const scroll = ((t * g.speed * g.direction) % spacing + spacing) % spacing;
+
+        for (let i = -Math.ceil(g.count / 2) - 1; i <= Math.ceil(g.count / 2) + 1; i++) {
+          const y = i * spacing + scroll;
+
+          // Along-line gradient: bright in the middle 60%, fade at both ends
+          const half = diag * 0.55;
+          const grad = ctx.createLinearGradient(-half, 0, half, 0);
           grad.addColorStop(0,    `rgba(178,34,52,0)`);
-          grad.addColorStop(0.12, `rgba(178,34,52,${th.alpha * 0.5})`);
-          grad.addColorStop(0.40, `rgba(178,34,52,${th.alpha})`);
-          grad.addColorStop(0.72, `rgba(178,34,52,${th.alpha * 0.55})`);
+          grad.addColorStop(0.12, `rgba(178,34,52,${g.alpha * 0.45})`);
+          grad.addColorStop(0.38, `rgba(178,34,52,${g.alpha})`);
+          grad.addColorStop(0.62, `rgba(178,34,52,${g.alpha})`);
+          grad.addColorStop(0.88, `rgba(178,34,52,${g.alpha * 0.45})`);
           grad.addColorStop(1,    `rgba(178,34,52,0)`);
-        } else {
-          grad.addColorStop(0,    `rgba(178,34,52,0)`);
-          grad.addColorStop(0.28, `rgba(178,34,52,${th.alpha * 0.55})`);
-          grad.addColorStop(0.60, `rgba(178,34,52,${th.alpha})`);
-          grad.addColorStop(0.88, `rgba(178,34,52,${th.alpha * 0.5})`);
-          grad.addColorStop(1,    `rgba(178,34,52,0)`);
+
+          ctx.save();
+          ctx.shadowColor = `rgba(178,34,52,0.12)`;
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          ctx.moveTo(-half, y);
+          ctx.lineTo( half, y);
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = g.lw;
+          ctx.lineCap = "round";
+          ctx.stroke();
+          ctx.restore();
         }
 
-        ctx.save();
-        ctx.shadowColor = `rgba(178,34,52,${th.alpha * 0.35})`;
-        ctx.shadowBlur = 8;
-        ctx.beginPath();
-        ctx.moveTo(x0, y);
-        ctx.bezierCurveTo(x1, y + w1, x2, y + w2, x3, y + w1 * 0.15);
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = th.lineWidth;
-        ctx.lineCap = "round";
-        ctx.stroke();
         ctx.restore();
       }
 
-      t += 0.011;
+      t += 0.016;
       animId = requestAnimationFrame(draw);
     };
 

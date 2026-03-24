@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useLocale, useTranslations } from 'next-intl';
@@ -15,11 +15,26 @@ const navLinks = [
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [visible, setVisible] = useState(false);
   const locale = useLocale();
   const t = useTranslations('nav');
 
+  useEffect(() => {
+    const onScroll = () => setVisible(window.scrollY > 60);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
-    <header className="border-b bg-white sticky top-0 z-50" style={{ borderBottomWidth: '0.5px', borderBottomColor: '#E8E9EC' }}>
+    <header
+      className="fixed top-0 left-0 right-0 z-50 bg-white transition-all duration-500"
+      style={{
+        borderBottom: visible ? '0.5px solid #E8E9EC' : 'none',
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(-100%)',
+        pointerEvents: visible ? 'auto' : 'none',
+      }}
+    >
       <div className="max-w-content mx-auto px-6 md:px-12 lg:px-8">
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
